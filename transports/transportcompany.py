@@ -3,14 +3,14 @@ from .client import Client
 class TransportCompany:  # Класс транспортной компании
     def __init__(self, name):  # Конструктор для создания компании
         if not isinstance(name, str):
-            raise ValueError("Name must be a string.")  # Проверка типа имени
+            raise ValueError("Название должно быть строкой.")  # Проверка типа имени
         self.name = name  # Название компании
         self.vehicles = []  # Список транспортных средств компании
         self.clients = []  # Список клиентов компании
 
     def add_vehicle(self, vehicle):  # Метод для добавления транспортного средства
         if not isinstance(vehicle, Vehicle):
-            raise ValueError("Invalid vehicle type.")  # Проверка типа транспортного средства
+            raise ValueError("Недопустимый тип транспорта.")  # Проверка типа транспортного средства
         self.vehicles.append(vehicle)  # Добавление транспортного средства в список
 
     def list_vehicles(self):  # Метод для получения списка всех транспортных средств
@@ -18,7 +18,7 @@ class TransportCompany:  # Класс транспортной компании
 
     def add_client(self, client):  # Метод для добавления клиента
         if not isinstance(client, Client):
-            raise ValueError("Invalid client type.")  # Проверка типа клиента
+            raise ValueError("Недопустимый тип клиента")  # Проверка типа клиента
         self.clients.append(client)  # Добавление клиента в список
 
     def optimize_cargo_distribution(self):  # Метод для оптимизации распределения грузов
