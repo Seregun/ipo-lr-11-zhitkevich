@@ -6,18 +6,18 @@ def main():  # Основная функция программы
     company = TransportCompany("Global Logistics")  # Создание транспортной компании
 
     while True:  # Бесконечный цикл для работы меню
-        print("\n--- Transport Company Menu ---")  # Заголовок меню
-        print("1. Add Client")  # Пункт меню: Добавить клиента
-        print("2. Add Vehicle")  # Пункт меню: Добавить транспорт
-        print("3. List Vehicles")  # Пункт меню: Список транспорта
+        print("\n--- Меню ---")  # Заголовок меню
+        print("1. Добавить клиента")  # Пункт меню: Добавить клиента
+        print("2. Добавить транспорт")  # Пункт меню: Добавить транспорт
+        print("3. Список транспорта")  # Пункт меню: Список транспорта
         print("4. Distribute Cargo")  # Пункт меню: Распределить груз
-        print("5. Exit")  # Пункт меню: Выход
+        print("5. Выход")  # Пункт меню: Выход
 
-        choice = input("Enter your choice: ")  # Считывание выбора пользователя
+        choice = input("Введите пункт меню: ")  # Считывание выбора пользователя
 
         if choice == "1":  # Если выбран пункт 1
-            name = input("Enter client name: ")  # Ввод имени клиента
-            cargo_weight = float(input("Enter cargo weight: "))  # Ввод веса груза
+            name = input("Введите имя клиента: ")  # Ввод имени клиента
+            cargo_weight = float(input("Введите вес: "))  # Ввод веса груза
             is_vip = input("Is VIP client? (yes/no): ").strip().lower() == "yes"  # Проверка статуса VIP
             try:
                 new_client = client(name, cargo_weight, is_vip) # Создание объекта клиента
