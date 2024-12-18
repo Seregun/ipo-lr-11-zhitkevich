@@ -1,86 +1,178 @@
-import dearpygui.dearpygui as dpg
-from transports.client import Client
-from transports.truck import Truck
-from transports.train import Train
-from transports.transportcompany import TransportCompany
-import pickle
+import tkinter as tk
+from tkinter import messagebox, ttk, filedialog
+import random
 
-company = TransportCompany("Global Logistics")
+# Основной класс приложения
+class TransportApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Транспортная компания")
 
-def add_client_callback(sender, app_data, user_data):
-    name = dpg.get_value("client_name")
-    cargo_weight = dpg.get_value("client_weight")
-    is_vip = dpg.get_value("client_vip")
-    try:
-        new_client = Client(name, cargo_weight, is_vip)
-        company.add_client(new_client)
-        dpg.configure_item("status", default_value="Клиент добавлен успешно.")
-    except ValueError as e:
-        dpg.configure_item("status", default_value=f"Ошибка: {e}")
+        # Меню
+        self.create_menu()
 
-def add_transport_callback(sender, app_data, user_data):
-    transport_type = dpg.get_value("transport_type")
-    capacity = dpg.get_value("transport_capacity")
-    if transport_type == "Truck":
-        color = dpg.get_value("truck_color")
-        try:
-            new_truck = Truck(capacity, color)
-            company.add_vehicle(new_truck)
-            dpg.configure_item("status", default_value="Грузовик добавлен успешно.")
-        except ValueError as e:
-            dpg.configure_item("status", default_value=f"Ошибка: {e}")
-    elif transport_type == "Train":
-        number_of_cars = dpg.get_value("number_of_cars")
-        try:
-            new_train = Train(capacity, number_of_cars)
-            company.add_vehicle(new_train)
-            dpg.configure_item("status", default_value="Поезд добавлен успешно.")
-        except ValueError as e:
-            dpg.configure_item("status", default_value=f"Ошибка: {e}")
+        # Панель управления
+        self.create_control_panel()
 
-def save_data_callback(sender, app_data, user_data):
-    with open("data.pkl", "wb") as f:
-        pickle.dump({"clients": company.clients, "vehicles": company.vehicles}, f)
-    dpg.configure_item("status", default_value="Данные сохранены успешно.")
+        # Таблицы данных
+        self.create_tables()
 
-dpg.create_context()
+        # Статусная строка
+        self.status_label = tk.Label(self.root, text="Добро пожаловать!", anchor="w")
+        self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-# Загрузка шрифта, поддерживающего кириллицу
-with dpg.font_registry():
-    with dpg.font("Roboto-Regular.ttf", 20) as default_font:
-        dpg.add_font_range_hint(dpg.mvFontRangeHint_Cyrillic)
+    def create_menu(self):
+        menu = tk.Menu(self.root)
+        self.root.config(menu=menu)
 
-dpg.bind_font(default_font)
+        file_menu = tk.Menu(menu, tearoff=0)
+        file_menu.add_command(label="Экспорт результата", command=self.export_data)
+        menu.add_cascade(label="Файл", menu=file_menu)
 
-with dpg.window(label="Главное окно приложения"):
-    with dpg.menu_bar():
-        with dpg.menu(label="Меню"):
-            dpg.add_menu_item(label="Экспорт результата", callback=save_data_callback)
-            dpg.add_menu_item(label="О программе", callback=lambda: dpg.show_item("about_window"))
+        help_menu = tk.Menu(menu, tearoff=0)
+        help_menu.add_command(label="О программе", command=self.show_about)
+        menu.add_cascade(label="Помощь", menu=help_menu)
 
-    with dpg.group(label="Управление клиентами"):
-        dpg.add_input_text(label="Имя клиента", tag="client_name")
-        dpg.add_input_float(label="Вес груза", tag="client_weight")
-        dpg.add_checkbox(label="VIP статус", tag="client_vip")
-        dpg.add_button(label="Добавить клиента", callback=add_client_callback)
+    def create_control_panel(self):
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(side=tk.TOP, fill=tk.X)
 
-    with dpg.group(label="Управление транспортом"):
-        dpg.add_combo(label="Тип транспорта", items=["Грузовик", "Поезд"], tag="transport_type")
-        dpg.add_input_float(label="Грузоподъемность", tag="transport_capacity")
-        dpg.add_input_text(label="Цвет грузовика", tag="truck_color", show=False)
-        dpg.add_input_int(label="Количество вагонов", tag="number_of_cars", show=False)
-        dpg.add_button(label="Добавить транспорт", callback=add_transport_callback)
+        tk.Button(control_frame, text="Добавить клиента", command=self.add_client).pack(side=tk.LEFT, padx=5, pady=5)
+        tk.Button(control_frame, text="Добавить транспорт", command=self.add_vehicle).pack(side=tk.LEFT, padx=5, pady=5)
+        tk.Button(control_frame, text="Распределить грузы", command=self.optimize_cargo).pack(side=tk.LEFT, padx=5, pady=5)
 
-    dpg.add_text(tag="status", default_value="")
+    def create_tables(self):
+        table_frame = tk.Frame(self.root)
+        table_frame.pack(fill=tk.BOTH, expand=True)
 
-with dpg.window(label="О программе", tag="about_window", show=False):
-    dpg.add_text("ЛР11 - GUI реализация")
-    dpg.add_text("Вариант: 1")
-    dpg.add_text("Разработчик: Житкевич Максим")
-    dpg.add_button(label="Закрыть", callback=lambda: dpg.hide_item("about_window"))
+        self.client_table = ttk.Treeview(table_frame, columns=("name", "cargo", "vip"), show="headings")
+        self.client_table.heading("name", text="Имя клиента")
+        self.client_table.heading("cargo", text="Вес груза")
+        self.client_table.heading("vip", text="VIP")
+        self.client_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-dpg.create_viewport(title='ЛР11 GUI', width=800, height=600)
-dpg.setup_dearpygui()
-dpg.show_viewport()
-dpg.start_dearpygui()
-dpg.destroy_context()
+        self.vehicle_table = ttk.Treeview(table_frame, columns=("id", "type", "capacity", "load"), show="headings")
+        self.vehicle_table.heading("id", text="ID транспорта")
+        self.vehicle_table.heading("type", text="Тип транспорта")
+        self.vehicle_table.heading("capacity", text="Грузоподъемность")
+        self.vehicle_table.heading("load", text="Текущая загрузка")
+        self.vehicle_table.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+    def add_client(self):
+        def save_client():
+            name = name_entry.get()
+            cargo = cargo_entry.get()
+            vip = vip_var.get()
+
+            if not name.isalpha() or len(name) < 2:
+                messagebox.showerror("Ошибка", "Имя должно содержать минимум 2 буквы.")
+                return
+
+            try:
+                cargo = float(cargo)
+                if cargo <= 0 or cargo > 1000:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Ошибка", "Вес груза должен быть положительным числом не более 1000 тонн.")
+                return
+
+            self.client_table.insert("", "end", values=(name, cargo, "Да" if vip else "Нет"))
+            self.status_label.config(text="Клиент добавлен.")
+            client_window.destroy()
+
+        client_window = tk.Toplevel(self.root)
+        client_window.title("Добавить клиента")
+
+        tk.Label(client_window, text="Имя клиента:").grid(row=0, column=0, padx=5, pady=5)
+        name_entry = tk.Entry(client_window)
+        name_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Label(client_window, text="Вес груза (тонн):").grid(row=1, column=0, padx=5, pady=5)
+        cargo_entry = tk.Entry(client_window)
+        cargo_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        vip_var = tk.BooleanVar()
+        tk.Checkbutton(client_window, text="VIP клиент", variable=vip_var).grid(row=2, column=1, padx=5, pady=5, sticky="w")
+
+        tk.Button(client_window, text="Сохранить", command=save_client).grid(row=3, column=0, columnspan=2, pady=10)
+
+    def add_vehicle(self):
+        def save_vehicle():
+            vehicle_type = type_var.get()
+            capacity = capacity_entry.get()
+
+            try:
+                capacity = float(capacity)
+                if capacity <= 0:
+                    raise ValueError
+            except ValueError:
+                messagebox.showerror("Ошибка", "Грузоподъемность должна быть положительным числом.")
+                return
+
+            vehicle_id = f"ID{random.randint(1000, 9999)}"  # Генерация случайного ID транспорта
+            self.vehicle_table.insert("", "end", values=(vehicle_id, vehicle_type, capacity, "0"))
+            self.status_label.config(text="Транспорт добавлен.")
+            vehicle_window.destroy()
+
+        vehicle_window = tk.Toplevel(self.root)
+        vehicle_window.title("Добавить транспорт")
+
+        tk.Label(vehicle_window, text="Тип транспорта:").grid(row=0, column=0, padx=5, pady=5)
+        type_var = tk.StringVar()
+        type_menu = ttk.Combobox(vehicle_window, textvariable=type_var, values=["Грузовик", "Поезд"])
+        type_menu.grid(row=0, column=1, padx=5, pady=5)
+        type_menu.current(0)
+
+        tk.Label(vehicle_window, text="Грузоподъемность (тонн):").grid(row=1, column=0, padx=5, pady=5)
+        capacity_entry = tk.Entry(vehicle_window)
+        capacity_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        tk.Button(vehicle_window, text="Сохранить", command=save_vehicle).grid(row=2, column=0, columnspan=2, pady=10)
+
+    def optimize_cargo(self):
+        clients = [(self.client_table.item(item)['values'][0],  # Имя клиента
+                    float(self.client_table.item(item)['values'][1]),  # Вес груза
+                    self.client_table.item(item)['values'][2] == "Да")  # VIP статус
+                   for item in self.client_table.get_children()]
+
+        vehicles = [(self.vehicle_table.item(item)['values'][0],  # ID транспорта
+                     self.vehicle_table.item(item)['values'][1],  # Тип транспорта
+                     float(self.vehicle_table.item(item)['values'][2]),  # Грузоподъемность
+                     float(self.vehicle_table.item(item)['values'][3]))  # Текущая загрузка
+                    for item in self.vehicle_table.get_children()]
+
+        # Сортировка клиентов по VIP статусу и весу груза
+        clients.sort(key=lambda x: (-x[2], -x[1]))
+
+        for client_name, cargo_weight, is_vip in clients:
+            for i, (vehicle_id, vehicle_type, capacity, current_load) in enumerate(vehicles):
+                available_capacity = capacity - current_load
+                if available_capacity >= cargo_weight:
+                    # Обновление данных транспорта
+                    vehicles[i] = (vehicle_id, vehicle_type, capacity, current_load + cargo_weight)
+                    self.status_label.config(text=f"Груз {client_name} распределен.")
+                    break
+            else:
+                messagebox.showwarning("Предупреждение", f"Недостаточно транспорта для клиента {client_name}.")
+
+        # Обновление таблицы транспорта
+        for item in self.vehicle_table.get_children():
+            self.vehicle_table.delete(item)
+        for vehicle_id, vehicle_type, capacity, current_load in vehicles:
+            self.vehicle_table.insert("", "end", values=(vehicle_id, vehicle_type, capacity, current_load))
+
+    def export_data(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
+        if file_path:
+            with open(file_path, "w") as file:
+                file.write("Результаты распределения грузов:\n")
+                file.write("(Данные будут добавлены здесь)")
+            messagebox.showinfo("Экспорт", "Результаты успешно сохранены.")
+
+    def show_about(self):
+        messagebox.showinfo("О программе", "ЛР 12, Вариант 1\nРазработчик: Житкевич Максим")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = TransportApp(root)
+    root.mainloop()
