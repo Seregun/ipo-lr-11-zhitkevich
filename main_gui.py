@@ -2,6 +2,68 @@ import tkinter as tk
 from tkinter import messagebox, ttk, filedialog
 import random
 
+# Класс транспортной компании
+class TransportCompany:
+    def __init__(self, name):
+        self.name = name
+        self.vehicles = []
+        self.clients = []
+
+    def add_vehicle(self, vehicle):
+        if not isinstance(vehicle, Vehicle):
+            raise TypeError("Vehicle must be an instance of Vehicle class")
+        self.vehicles.append(vehicle)
+
+    def list_vehicles(self):
+        return self.vehicles
+
+    def add_client(self, client):
+        if not isinstance(client, Client):
+            raise TypeError("Client must be an instance of Client class")
+        self.clients.append(client)
+
+    def optimize_cargo_distribution(self):
+        # Сортировка клиентов: VIP клиенты в приоритете
+        self.clients.sort(key=lambda x: x.vip, reverse=True)
+
+        # Распределение грузов
+        for client in self.clients:
+            if client.cargo_assigned:
+                continue
+
+            for vehicle in self.vehicles:
+                if vehicle.available_capacity >= client.cargo:
+                    vehicle.load_cargo(client)
+                    client.cargo_assigned = True
+                    break
+
+# Класс транспортного средства
+class Vehicle:
+    def __init__(self, vehicle_id, vehicle_type, capacity):
+        self.vehicle_id = vehicle_id
+        self.vehicle_type = vehicle_type
+        self.capacity = capacity
+        self.current_load = 0
+        self.cargo_list = []
+
+    @property
+    def available_capacity(self):
+        return self.capacity - self.current_load
+
+    def load_cargo(self, client):
+        self.current_load += client.cargo
+        self.cargo_list.append(client)
+        client.vehicle = self
+
+# Класс клиента
+class Client:
+    def __init__(self, name, cargo, vip):
+        self.name = name
+        self.cargo = cargo
+        self.vip = vip
+        self.cargo_assigned = False
+        self.vehicle = None
+
 # Основной класс приложения
 class TransportApp:
     def __init__(self, root):
@@ -20,6 +82,9 @@ class TransportApp:
         # Статусная строка
         self.status_label = tk.Label(self.root, text="Добро пожаловать!", anchor="w")
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Транспортная компания
+        self.transport_company = None
 
     def create_menu(self):
         menu = tk.Menu(self.root)
@@ -41,6 +106,7 @@ class TransportApp:
         tk.Button(control_frame, text="Добавить транспорт", command=self.add_vehicle).pack(side=tk.LEFT, padx=5, pady=5)
         tk.Button(control_frame, text="Распределить грузы", command=self.optimize_cargo).pack(side=tk.LEFT, padx=5, pady=5)
         tk.Button(control_frame, text="Удалить запись", command=self.delete_selected).pack(side=tk.LEFT, padx=5, pady=5)
+        tk.Button(control_frame, text="Транспортная компания", command=self.create_company).pack(side=tk.LEFT, padx=5, pady=5)
 
         # Фильтрация
         tk.Label(control_frame, text="Фильтр по типу транспорта:").pack(side=tk.LEFT, padx=5, pady=5)
@@ -55,18 +121,20 @@ class TransportApp:
         table_frame = tk.Frame(self.root)
         table_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.client_table = ttk.Treeview(table_frame, columns=("name", "cargo", "vip"), show="headings")
+        self.client_table = ttk.Treeview(table_frame, columns=("name", "cargo", "vip", "vehicle"), show="headings")
         self.client_table.heading("name", text="Имя клиента", command=lambda: self.sort_column(self.client_table, "name"))
         self.client_table.heading("cargo", text="Вес груза (кг)", command=lambda: self.sort_column(self.client_table, "cargo"))
         self.client_table.heading("vip", text="VIP", command=lambda: self.sort_column(self.client_table, "vip"))
+        self.client_table.heading("vehicle", text="Транспорт", command=lambda: self.sort_column(self.client_table, "vehicle"))
         self.client_table.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.client_table.bind("<Double-1>", self.edit_client)
 
-        self.vehicle_table = ttk.Treeview(table_frame, columns=("id", "type", "capacity", "load"), show="headings")
+        self.vehicle_table = ttk.Treeview(table_frame, columns=("id", "type", "capacity", "load", "cargo_list"), show="headings")
         self.vehicle_table.heading("id", text="ID транспорта", command=lambda: self.sort_column(self.vehicle_table, "id"))
         self.vehicle_table.heading("type", text="Тип транспорта", command=lambda: self.sort_column(self.vehicle_table, "type"))
         self.vehicle_table.heading("capacity", text="Грузоподъемность", command=lambda: self.sort_column(self.vehicle_table, "capacity"))
         self.vehicle_table.heading("load", text="Текущая загрузка", command=lambda: self.sort_column(self.vehicle_table, "load"))
+        self.vehicle_table.heading("cargo_list", text="Список грузов", command=lambda: self.sort_column(self.vehicle_table, "cargo_list"))
         self.vehicle_table.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         self.vehicle_table.bind("<Double-1>", self.edit_vehicle)
 
@@ -109,7 +177,10 @@ class TransportApp:
                 messagebox.showerror("Ошибка", "Вес груза должен быть положительным числом не более 10000 кг.")
                 return
 
-            self.client_table.insert("", "end", values=(name, cargo, "Да" if vip else "Нет"))
+            client = Client(name, cargo, vip)
+            self.client_table.insert("", "end", values=(name, cargo, "Да" if vip else "Нет", ''))
+            if self.transport_company:
+                self.transport_company.add_client(client)
             self.status_label.config(text="Клиент добавлен.")
             client_window.destroy()
 
@@ -147,7 +218,10 @@ class TransportApp:
                 return
 
             vehicle_id = f"ID{random.randint(100, 999)}"
-            self.vehicle_table.insert("", "end", values=(vehicle_id, vehicle_type, capacity, "0"))
+            vehicle = Vehicle(vehicle_id, vehicle_type, capacity)
+            self.vehicle_table.insert("", "end", values=(vehicle_id, vehicle_type, capacity, "0", ''))
+            if self.transport_company:
+                self.transport_company.add_vehicle(vehicle)
             self.status_label.config(text="Транспорт добавлен.")
             vehicle_window.destroy()
 
@@ -190,7 +264,7 @@ class TransportApp:
                 messagebox.showerror("Ошибка", "Вес груза должен быть положительным числом не более 10000 кг.")
                 return
 
-            self.client_table.item(selected_item, values=(name, cargo, "Да" if vip else "Нет"))
+            self.client_table.item(selected_item, values=(name, cargo, "Да" if vip else "Нет", ''))
             client_window.destroy()
 
         client_window = tk.Toplevel(self.root)
@@ -231,7 +305,7 @@ class TransportApp:
                 messagebox.showerror("Ошибка", "Грузоподъемность должна быть положительным числом.")
                 return
 
-            self.vehicle_table.item(selected_item, values=(values[0], vehicle_type, capacity, values[3]))
+            self.vehicle_table.item(selected_item, values=(values[0], vehicle_type, capacity, values[3], ''))
             vehicle_window.destroy()
 
         vehicle_window = tk.Toplevel(self.root)
@@ -258,67 +332,25 @@ class TransportApp:
         self.status_label.config(text="Запись удалена.")
 
     def optimize_cargo(self):
-        # Получаем данные о клиентах и транспорте
-        clients = [(self.client_table.item(i, "values")) for i in self.client_table.get_children()]
-        vehicles = [(self.vehicle_table.item(i, "values")) for i in self.vehicle_table.get_children()]
+        if not self.transport_company:
+            messagebox.showerror("Ошибка", "Сначала создайте транспортную компанию!")
+            return
 
-        # Сортировка клиентов: VIP клиенты в приоритете
-        clients.sort(key=lambda x: x[2] == "Да", reverse=True)
+        self.transport_company.optimize_cargo_distribution()
 
-        # Окно для отображения результатов
-        result_window = tk.Toplevel(self.root)
-        result_window.title("Результаты распределения")
-        result_table = ttk.Treeview(result_window, columns=("client", "vehicle", "cargo"), show="headings")
-        result_table.heading("client", text="Клиент")
-        result_table.heading("vehicle", text="Транспорт")
-        result_table.heading("cargo", text="Груз")
-        result_table.pack(fill=tk.BOTH, expand=True)
+        # Обновление данных в таблицах
+        for i in self.client_table.get_children():
+            client_data = self.client_table.item(i, "values")
+            client = next(c for c in self.transport_company.clients if c.name == client_data[0])
+            self.client_table.item(i, values=(client_data[0], client_data[1], client_data[2], client.vehicle.vehicle_id if client.vehicle else ''))
 
-        # Процесс распределения грузов
-        for client in clients:
-            client_name, client_cargo, client_vip = client
-            client_cargo = float(client_cargo)  # Преобразуем в число
-            assigned = False  # Флаг, чтобы отследить распределение груза
-
-        for vehicle in vehicles:
-            vehicle_id, vehicle_type, vehicle_capacity, vehicle_load = vehicle
-            vehicle_capacity = float(vehicle_capacity)  # Преобразуем в число
-            vehicle_load = float(vehicle_load)  # Преобразуем в число
-
-            # Проверка возможности загрузки груза в транспорт
-            if client_cargo <= (vehicle_capacity - vehicle_load):
-                # Обновляем загрузку транспорта
-                new_vehicle_load = vehicle_load + client_cargo
-
-                # Обновляем данные в таблице транспорта
-                for item in self.vehicle_table.get_children():
-                    row_values = self.vehicle_table.item(item, "values")
-                    if row_values[0] == vehicle_id:  # ID транспорта совпадает
-                        self.vehicle_table.item(item, values=(vehicle_id, vehicle_type, vehicle_capacity, new_vehicle_load))
-                        break
-
-                # Добавляем запись в таблицу результатов
-                result_table.insert("", "end", values=(client_name, vehicle_id, client_cargo))
-
-                # Обновляем данные в списке транспортных средств
-                vehicles[vehicles.index(vehicle)] = (vehicle_id, vehicle_type, vehicle_capacity, new_vehicle_load)
-
-                # Устанавливаем флаг распределения
-                assigned = True
-                break
-
-        # Если груз клиента не удалось распределить
-        if not assigned:
-            result_table.insert("", "end", values=(client_name, "Не распределено", client_cargo))
-
-        # Кнопка для закрытия окна
-        tk.Button(result_window, text="Закрыть", command=result_window.destroy).pack(pady=10)
+        for i in self.vehicle_table.get_children():
+            vehicle_data = self.vehicle_table.item(i, "values")
+            vehicle = next(v for v in self.transport_company.vehicles if v.vehicle_id == vehicle_data[0])
+            self.vehicle_table.item(i, values=(vehicle_data[0], vehicle_data[1], vehicle_data[2], vehicle.current_load, ', '.join([c.name for c in vehicle.cargo_list])))
 
         # Обновление статуса
         self.status_label.config(text="Распределение завершено.")
-
-
-
 
     def export_data(self):
         # Экспорт данных в файл
@@ -330,9 +362,32 @@ class TransportApp:
                 for item in self.vehicle_table.get_children():
                     file.write(f"Транспорт: {self.vehicle_table.item(item, 'values')}\n")
             self.status_label.config(text="Данные экспортированы.")
-            
+
     def show_about(self):
         messagebox.showinfo("О программе", "Транспортная компания v1.0\nРазработчик: Ваша команда")
+
+    def create_company(self):
+        def save_company():
+            company_name = company_entry.get()
+            if not company_name:
+                messagebox.showerror("Ошибка", "Введите название компании")
+                return
+            self.transport_company = TransportCompany(company_name)
+            company_window.destroy()
+            self.status_label.config(text=f"Создана транспортная компания '{company_name}'")
+
+        def cancel_company():
+            company_window.destroy()
+
+        company_window = tk.Toplevel(self.root)
+        company_window.title("Создать компанию")
+
+        tk.Label(company_window, text="Название компании:").grid(row=0, column=0, padx=5, pady=5)
+        company_entry = tk.Entry(company_window)
+        company_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Button(company_window, text="Создать", command=save_company).grid(row=1, column=0, pady=10)
+        tk.Button(company_window, text="Отмена", command=cancel_company).grid(row=1, column=1, pady=10)
             
 # Создание и запуск приложения
 root = tk.Tk()
