@@ -364,7 +364,7 @@ class TransportApp:
             self.status_label.config(text="Данные экспортированы.")
 
     def show_about(self):
-        messagebox.showinfo("О программе", "Транспортная компания v1.0\nРазработчик: Ваша команда")
+        messagebox.showinfo("О программе\n", "ЛР12, Вариант 1\nРазработчик: Житкевич Максим")
 
     def create_company(self):
         def save_company():
